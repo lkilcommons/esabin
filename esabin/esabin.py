@@ -167,7 +167,7 @@ class EsagridFileBingroup(object):
 		# 	while h5datasetnm in h5grp:
 		# 		h5datasetnm += '0'
 
-		dataset = h5grp.create_dataset(h5datasetnm,data=this_data)
+		dataset = h5grp.create_dataset(h5datasetnm,data=data)
 		if additional_attrs is not None:
 			for attr in additional_attrs:
 				dataset.attrs[attr]=additional_attrs[attr]
@@ -260,6 +260,12 @@ class esagrid_file(object):
 
 	def __getitem__(self,flatind):
 		return self._bingroups[flatind]
+
+	def __setitem__(self,flatind,esagrid_file_bingroup):
+		if not isinstance(esagrid_file_bingroup,EsagridFileBingroup):
+			raise TypeError(('{}'.format(esagrid_file_bingroup)
+							+' is not an EsagridFileBingroup'))
+		self._bingroups[flatind] = esagrid_file_bingroup
 
 	def __contains__(self,flatind):
 		return flatind in self._bingroups
