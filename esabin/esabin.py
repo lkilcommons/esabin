@@ -393,10 +393,9 @@ class esagrid_file(object):
 						print('{} is not a bin group, skipping'.format(groupnm))
 						continue
 
-					grp = h5f[groupnm]
-
-					#Check for old or missing metadata
-					self.check_bin_group_metadata(grp,fix=True)
+					esagrid_file_bingroup = EsagridFileBingroup(self.grid,flatind)
+					#Load h5 group and check for old or missing metadata
+					grp = esagrid_file_bingroup.get_h5group(h5f)
 
 					#Skip bins below the desired latitude
 					if np.abs(grp.attrs['slat'])<minlat and np.abs(grp.attrs['elat'])<minlat:
