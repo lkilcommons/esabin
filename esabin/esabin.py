@@ -186,7 +186,7 @@ class EsagridFileBingroup(object):
 			data = h5grp[dset_timestr][:]
 			times.append(dataset_time)
 			datasets.append(data)
-			additional_attrs.append({key:val for key,val in h5grp.attrs.items()})
+			additional_attrs.append({key:val for key,val in h5grp[dset_timestr].attrs.items()})
 		return times,datasets,additional_attrs
 
 class esagrid_file(object):
