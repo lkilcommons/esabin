@@ -15,6 +15,9 @@ class InvalidFlatIndexError(Exception):
 class InvalidBinGroupNameError(Exception):
 	pass
 
+class EsagridBinComparisonError(Exception):
+	pass
+
 class EsagridBin(object):
 	"""Class which abstractly represents one bin in a grid"""
 	def __init__(self,grid,flatind):
@@ -47,6 +50,14 @@ class EsagridBin(object):
 		return ('#%d,' % (self['flatind'])
 		 		+'lat:%.3f-%.3f,' % (self['slat'],self['elat'])
 		 		+'%s:%.3f-%.3f' % (self['azi_coord'],self['sazi'],self['eazi']))
+
+	def __eq__(self,other):
+		bin_edge_keys = ['slat','elat','sazi','eazi']
+		edges_match = []
+		for key in bin_edge_keys:
+			edges_match.append(np.isclose(self[key],other[key],
+											rtol=0.,atol=1.0e-8))
+		return all(edges_match)
 
 	def __getitem__(self,key):
 		return self._meta[key]
@@ -175,6 +186,29 @@ class EsagridFileBingroup(object):
 		if not silent:
 			print("Added %d points to %s" % (np.count_nonzero(in_bin),
 											h5grp.attrs['longname']))
+
+	def copy(self,h5f,destination_esagrid_file_bingroup,destination_h5f):
+		src_esagrid_bin = self.esagrid_bin
+		dest_esagrid_bin = destination_esagrid_file_bingroup.esagrid_bin
+		if src_esagrid_bin != dest_esagrid_bin:
+			raise EsagridBinComparisonError(('Cannot copy because '
+											+'destination bin metadata does '
+											+'not match source bin metadata '
+											+'{} != '.format(str(dest_esagrid_bin))
+											+'{}'.format(str(src_esagrid_bin))))
+
+		h5grp = self.get_h5group(h5f)
+		other_h5grp = destination_esagrid_file_bingroup.get_h5group(destination_h5f)
+		for dataset_name in h5grp:
+			if dataset_name in other_h5grp:
+				raise EsaGridFileDuplicateTimeError(('Error while copying. '
+													+' Dataset with name '
+					                             	+' {}'.format(h5datasetnm)
+					                             	+' already exists in '
+					                             	+' destination '
+					                             	+' group {}'.format(h5grp)))
+			#Only h5py Group objects have a copy method
+			h5grp.copy(dataset_name,other_h5grp,name=dataset_name)
 
 	def read(self,h5f):
 		h5grp = self.get_h5group(h5f)
@@ -490,8 +524,9 @@ class esagrid(object):
 				the minimum number of bins in a latitude band
 				default is 3
 
-			azi_coord - {'longitude','lon','localtime','lt','mlt'}, optional
+			azi_coord - {'lon','lt'}, optional
 				Which type of zonal/azimuthal/longitudinal coordinate to use
+				('lon' for longitude, 'lt' forlocaltime)
 
 			rectangular - bool, optional
 				Use a rectangular grid ()
@@ -521,12 +556,12 @@ class esagrid(object):
 
 		#Determine conversion factor for radians to hours or degress
 		#depending on whether we're using longitude or localtime
-		if self.azi_coord in ['lon','Lon','LON','Longitude']:
+		if self.azi_coord == 'lon':
 			self.azi_fac = 180./np.pi
 			self.max_azi = 180.
 			self.min_azi = -180.
 			self.azi_units = 'degrees'
-		elif self.azi_coord in ['lt','mlt','LT','MLT','Localtime','localtime']:
+		elif self.azi_coord == 'lt':
 			self.azi_fac = 12./np.pi
 			self.max_azi = 12.
 			self.min_azi = -12.
@@ -574,6 +609,13 @@ class esagrid(object):
 		strrep += 'Azimuth Range {} - {}\n'.format(self.min_azi,self.max_azi)
 		strrep += '{} total bins'.format(np.nanmax(self.all_bin_inds))
 		return strrep
+
+	def __eq__(self,other):
+		if not isinstance(other,esagrid):
+			raise TypeError('{} is not an esagrid instance'.format(other))
+		return (self.delta_lat==other.delta_lat\
+				 and self.n_cap_bins==other.n_cap_bins\
+				 and self.azi_coord==other.azi_coord)
 
 	def azirangecheck(self,arr):
 		#fmod preserves sign of input
