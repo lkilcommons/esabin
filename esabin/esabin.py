@@ -121,8 +121,8 @@ class EsagridFileBingroup(object):
 				if h5group.attrs[attrname]!=attrval:
 					print('Group:{}'.format(h5group.name))
 					print('Incorrect Attribute {}'.format(attrname))
-					print('{}!={}'.format(expected_attrs[attrname],
-										grp.attrs[attrname]))
+					print('{}!={}'.format(attrval,
+										h5group.attrs[attrname]))
 					if fix:
 						h5group.attrs[attrname]=attrval
 						print('Fixed')
@@ -176,6 +176,41 @@ class EsagridFileBingroup(object):
 			print("Added %d points to %s" % (np.count_nonzero(in_bin),
 											h5grp.attrs['longname']))
 
+	def _columnify_additional_attrs(self,additional_attrs):
+		"""Takes a list of dictionaries. Each dictionary in the
+		list are the HDF5 dataset attributes from one dataset in this
+		bin's group. Converts this list of dictionaries to an
+		output dictionary of lists or arrays depending on the type of
+		data encountered. The keys of the output dictionary include any
+		keys encountered in an input dictionary. If a particular key is
+		not in every input dictionary a fill value with be inserted
+		The fill value is numpy.nan if the data is numeric,
+		otherwise it is None"""
+		keys = []
+		typefuncs = []
+		for attrdict in additional_attrs:
+			for key in attrdict:
+				if key not in keys:
+					keys.append(key)
+					try:
+						dum = float(attrdict[key])
+						typefuncs.append(float)
+					except ValueError:
+						typefuncs.append(str)
+					 
+		outdict = {key:[] for key in keys}
+		for attrdict in additional_attrs:
+			for key,typefunc in zip(keys,typefuncs):
+				if key in attrdict:
+					outdict[key].append(typefunc(attrdict[key]))
+				else:
+					outdict[key].append(np.nan if typefunc is float else None)
+
+		for key,typefunc in zip(keys,typefuncs):
+			if typefunc is float:
+				outdict[key]=np.array(outdict[key])
+		return outdict
+				
 	def read(self,h5f):
 		h5grp = self.get_h5group(h5f)
 		times = []
@@ -187,6 +222,7 @@ class EsagridFileBingroup(object):
 			times.append(dataset_time)
 			datasets.append(data)
 			additional_attrs.append({key:val for key,val in h5grp[dset_timestr].attrs.items()})
+		additional_attrs = self._columnify_additional_attrs(additional_attrs)
 		return times,datasets,additional_attrs
 
 class esagrid_file(object):
@@ -287,7 +323,10 @@ class esagrid_file(object):
 		with h5py.File(self.h5fn) as h5f:
 			delta_lat = h5f.attrs['delta_lat']
 			n_cap_bins = h5f.attrs['n_cap_bins']
-			azi_coord = h5f.attrs['azi_coord']
+			try:
+				azi_coord = str(h5f.attrs['azi_coord'],'utf8')
+			except:
+				azi_coord = h5f.attrs['azi_coord']
 
 		return esagrid(delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
 
