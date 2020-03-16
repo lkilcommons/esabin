@@ -259,7 +259,7 @@ class EsagridFileBingroup(object):
 		additional_attrs = self._columnify_additional_attrs(additional_attrs)
 		return times,datasets,additional_attrs
 
-class esagrid_file(object):
+class EsagridFile(object):
 	"""
 	Class for storing data associated with each bin of an esagrid object on disk.
 	Uses h5py interface to HDF5 library.
@@ -281,10 +281,10 @@ class esagrid_file(object):
 		grid - an esagrid instance, optional
 			The grid of bins to bin into. If it is None (default), a default grid
 			with delta_lat = 3 and n_cap_bins = 3 and azi_coord = 'lt' is used
+
 		hdf5_local_dir - str, optional
 			A valid local path at which the hdf5 files will be created
-			if this is None (default) the geospacepy configuration setting
-			config['esabin']['hdf5_local_dir'] will be used.
+
 		clobber - bool, optional
 			If True, will delete and overwrite the HDF5 file specified as os.path.join(hdf5_local_dir,hdf5_filenm)
 			if it exists.
@@ -300,7 +300,7 @@ class esagrid_file(object):
 		self.h5fn = os.path.join(self.hdf5dir,self.hdf5filenm)
 
 		#Default to grid of with 3 latitude bins if no grid passed
-		default_grid = esagrid(3.)
+		default_grid = DefaultEsagrid()
 
 		if os.path.exists(self.h5fn):
 			if not clobber:
@@ -362,7 +362,7 @@ class esagrid_file(object):
 			except:
 				azi_coord = h5f.attrs['azi_coord']
 
-		return esagrid(delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
+		return Esagrid(delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
 
 	def bin_and_store(self,t,lat,lonorlt,data,silent=False,additional_attrs=None):
 
@@ -540,7 +540,7 @@ class esagrid_file(object):
 
 			return binlats,binlonorlts,binstats
 
-class esagrid(object):
+class Esagrid(object):
 	"""
 	Equal solid angle binning class. Equal solid angle binning is a way of binning geophysical data
 	(or other types of data which are naturally spherically located, lat, lon), which tackles the
@@ -838,3 +838,9 @@ class esagrid(object):
 		binlats,binlonorlts = self.bin_locations(center_or_edges=center_or_edges)
 
 		return binlats,binlonorlts,binstats
+
+class DefaultEsagrid(Esagrid):
+	"""Default settings of a 3 degrees latitude per band, 3 cap bins, with
+	localtime as the azimuthal coordinate"""
+	def __init__(self,delta_lat=3,n_cap_bins=3,azi_coord='lt'):
+		Esagrid.__init__(self,delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
