@@ -586,7 +586,7 @@ class Esagrid(object):
 			self.n_lat_bins = np.floor(self.n_lat_bins)
 
 		#Create the edges for each bin
-		self.lat_bin_edges = np.linspace(-90.,90.,num=self.n_lat_bins+1.)
+		self.lat_bin_edges = np.linspace(-90.,90.,num=int(self.n_lat_bins+1))
 		self.lon_bin_edges = []
 		self.flat_bins = [] #A flat list of bins from south to north, -180 to 180 lon
 							#format is flat_bins[i] = [ith_bin_lat_start,ith_bin_lat_end,ith_bin_lon_start,ith_bin_lon_end]
