@@ -789,7 +789,7 @@ class Esagrid(object):
 		N12 = (np.cos(th1)-np.cos(th2))/(1-np.cos(th2-th1))*n_cap_bins
 		N12 = np.abs(np.round(N12))
 		#+1 because we want N12 bins so we need N12+1 edges
-		bins = np.linspace(-1*np.pi,np.pi,num=N12+1)*self.azi_fac
+		bins = np.linspace(-1*np.pi,np.pi,num=int(N12+1))*self.azi_fac
 
 		#Check for any out of range values
 		#print bins
