@@ -1,3 +1,5 @@
+# (C) 2019 University of Colorado AES-CCAR-SEDA (Space Environment Data Analysis) Group
+# Liam Kilcommons - University of Colorado, Boulder - Colorado Center for Astrodynamics Research
 import numpy as np
 
 def angle_unit_as_radians(units):
