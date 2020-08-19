@@ -107,7 +107,7 @@ class EsagridFileBinGroup(object):
 		return h5grp
 
 	def append_from_other(self,h5f,other_h5f):
-		self_h5group = h5f[self.groupname]
+		self_h5group = self.get_h5group(h5f)
 		other_h5group = other_h5f[self.groupname]
 		self.check_bin_group_metadata(other_h5group,fix=False,raise_error=True)
 		for h5dsname,h5ds in other_h5group.items():
@@ -256,7 +256,7 @@ class EsagridFile(object):
 		self.binlats,self.binlonorlts = self.grid.bin_locations(center_or_edges='edges')
 
 		self._bingroups = {}
-		with h5py.File(self.h5fn) as h5f:
+		with h5py.File(self.h5fn,'r') as h5f:
 			for groupname in h5f:
 				try:
 					bingroup = EsagridFileBinGroup.from_groupname(self.grid,
