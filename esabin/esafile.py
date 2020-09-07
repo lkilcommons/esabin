@@ -16,6 +16,62 @@ class InvalidFlatIndexError(Exception):
 class InvalidBinGroupNameError(Exception):
 	pass
 
+class EsagridBinComparisonError(Exception):
+	pass
+
+class EsagridBin(object):
+	"""Class which abstractly represents one bin in a grid"""
+	def __init__(self,grid,flatind):
+		self._meta = OrderedDict()
+		self.grid = grid
+
+		self['flatind'] = flatind
+		self['slat'] = grid.flat_bins[flatind,0]
+		self['elat'] = grid.flat_bins[flatind,1]
+		self['lat'] = spheretools.angle_midpoint(self['slat'],
+													self['elat'],
+													grid.azi_units)
+		self['sazi'] = grid.flat_bins[flatind,2]
+		self['eazi'] = grid.flat_bins[flatind,3]
+		self['azi'] = spheretools.angle_midpoint(self['sazi'],
+													self['eazi'],
+													grid.azi_units)
+
+		#Alias azimuth coordinate by lon or lt
+		self['s{}'.format(grid.azi_coord)]=self['sazi']
+		self['e{}'.format(grid.azi_coord)]=self['eazi']
+		self['{}'.format(grid.azi_coord)]=self['azi']
+
+		self['azi_coord']=grid.azi_coord
+
+		#Long name of bin
+		self['longname'] = str(self)
+
+	def __str__(self):
+		return ('#%d,' % (self['flatind'])
+		 		+'lat:%.3f-%.3f,' % (self['slat'],self['elat'])
+		 		+'%s:%.3f-%.3f' % (self['azi_coord'],self['sazi'],self['eazi']))
+
+	def __eq__(self,other):
+		bin_edge_keys = ['slat','elat','sazi','eazi']
+		edges_match = []
+		for key in bin_edge_keys:
+			edges_match.append(np.isclose(self[key],other[key],
+											rtol=0.,atol=1.0e-8))
+		return all(edges_match)
+
+	def __getitem__(self,key):
+		return self._meta[key]
+
+	def __setitem__(self,key,value):
+		self._meta[key]=value
+
+	def items(self):
+		return self._meta.items()
+
+	def __contains__(self,key):
+		return key in self._meta
+
 class EsagridFileBinGroup(object):
 	"""Class which abstractly represents the H5 group which describes
 	a bin's position and data"""
@@ -149,6 +205,29 @@ class EsagridFileBinGroup(object):
 			print("Added %d points to %s" % (data.size,
 											h5grp.attrs['longname']))
 
+	def copy(self,h5f,destination_esagrid_file_bingroup,destination_h5f):
+		src_esagrid_bin = self.esagrid_bin
+		dest_esagrid_bin = destination_esagrid_file_bingroup.esagrid_bin
+		if src_esagrid_bin != dest_esagrid_bin:
+			raise EsagridBinComparisonError(('Cannot copy because '
+											+'destination bin metadata does '
+											+'not match source bin metadata '
+											+'{} != '.format(str(dest_esagrid_bin))
+											+'{}'.format(str(src_esagrid_bin))))
+
+		h5grp = self.get_h5group(h5f)
+		other_h5grp = destination_esagrid_file_bingroup.get_h5group(destination_h5f)
+		for dataset_name in h5grp:
+			if dataset_name in other_h5grp:
+				raise EsaGridFileDuplicateTimeError(('Error while copying. '
+													+' Dataset with name '
+					                             	+' {}'.format(h5datasetnm)
+					                             	+' already exists in '
+					                             	+' destination '
+					                             	+' group {}'.format(h5grp)))
+			#Only h5py Group objects have a copy method
+			h5grp.copy(dataset_name,other_h5grp,name=dataset_name)
+
 	def _columnify_additional_attrs(self,additional_attrs):
 		"""Takes a list of dictionaries. Each dictionary in the
 		list are the HDF5 dataset attributes from one dataset in this
@@ -170,7 +249,7 @@ class EsagridFileBinGroup(object):
 						typefuncs.append(float)
 					except ValueError:
 						typefuncs.append(str)
-					 
+
 		outdict = {key:[] for key in keys}
 		for attrdict in additional_attrs:
 			for key,typefunc in zip(keys,typefuncs):
@@ -183,7 +262,7 @@ class EsagridFileBinGroup(object):
 			if typefunc is float:
 				outdict[key]=np.array(outdict[key])
 		return outdict
-				
+
 	def read(self,h5f):
 		h5grp = self.get_h5group(h5f)
 		times = []
@@ -197,6 +276,12 @@ class EsagridFileBinGroup(object):
 			additional_attrs.append({key:val for key,val in h5grp[dset_timestr].attrs.items()})
 		additional_attrs = self._columnify_additional_attrs(additional_attrs)
 		return times,datasets,additional_attrs
+
+class DefaultEsagrid(Esagrid):
+	"""Default settings of a 3 degrees latitude per band, 3 cap bins, with
+	localtime as the azimuthal coordinate"""
+	def __init__(self,delta_lat=3,n_cap_bins=3,azi_coord='lt'):
+		Esagrid.__init__(self,delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
 
 class EsagridFile(object):
 	"""
@@ -220,10 +305,10 @@ class EsagridFile(object):
 		grid - an esagrid instance, optional
 			The grid of bins to bin into. If it is None (default), a default grid
 			with delta_lat = 3 and n_cap_bins = 3 and azi_coord = 'lt' is used
+
 		hdf5_local_dir - str, optional
 			A valid local path at which the hdf5 files will be created
-			if this is None (default) the geospacepy configuration setting
-			config['esabin']['hdf5_local_dir'] will be used.
+
 		clobber - bool, optional
 			If True, will delete and overwrite the HDF5 file specified as os.path.join(hdf5_local_dir,hdf5_filenm)
 			if it exists.
@@ -240,7 +325,7 @@ class EsagridFile(object):
 
 		#Default to grid with 3 degree latitudes spacing and 
 		#3 latitude bins touching each pole if no grid passed
-		default_grid = Esagrid(3.)
+		default_grid = DefaultEsagrid()
 
 		if os.path.exists(self.h5fn):
 			if not clobber:
@@ -496,4 +581,3 @@ class EsagridFile(object):
 				binstats = binstats[0]
 
 			return binlats,binlonorlts,binstats
-
