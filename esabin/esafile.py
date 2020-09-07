@@ -16,9 +16,6 @@ class InvalidFlatIndexError(Exception):
 class InvalidBinGroupNameError(Exception):
 	pass
 
-<<<<<<< HEAD:esabin/esafile.py
-class EsagridFileBinGroup(object):
-=======
 class EsagridBinComparisonError(Exception):
 	pass
 
@@ -75,8 +72,7 @@ class EsagridBin(object):
 	def __contains__(self,key):
 		return key in self._meta
 
-class EsagridFileBingroup(object):
->>>>>>> b3784ae0c42f18e479224b62129f839bdf85e794:esabin/esabin.py
+class EsagridFileBinGroup(object):
 	"""Class which abstractly represents the H5 group which describes
 	a bin's position and data"""
 	def __init__(self,grid,flatind):
@@ -281,6 +277,13 @@ class EsagridFileBingroup(object):
 		additional_attrs = self._columnify_additional_attrs(additional_attrs)
 		return times,datasets,additional_attrs
 
+class DefaultEsagrid(Esagrid):
+	"""Default settings of a 3 degrees latitude per band, 3 cap bins, with
+	localtime as the azimuthal coordinate"""
+	def __init__(self,delta_lat=3,n_cap_bins=3,azi_coord='lt'):
+		Esagrid.__init__(self,delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
+
+
 class EsagridFile(object):
 	"""
 	Class for storing data associated with each bin of an esagrid object on disk.
@@ -321,14 +324,8 @@ class EsagridFile(object):
 		self.hdf5filenm = hdf5_filenm
 		self.h5fn = os.path.join(self.hdf5dir,self.hdf5filenm)
 
-<<<<<<< HEAD:esabin/esafile.py
-		#Default to grid with 3 degree latitudes spacing and 
-		#3 latitude bins touching each pole if no grid passed
-		default_grid = Esagrid(3.)
-=======
 		#Default to grid of with 3 latitude bins if no grid passed
 		default_grid = DefaultEsagrid()
->>>>>>> b3784ae0c42f18e479224b62129f839bdf85e794:esabin/esabin.py
 
 		if os.path.exists(self.h5fn):
 			if not clobber:
@@ -585,310 +582,3 @@ class EsagridFile(object):
 
 			return binlats,binlonorlts,binstats
 
-<<<<<<< HEAD:esabin/esafile.py
-=======
-class Esagrid(object):
-	"""
-	Equal solid angle binning class. Equal solid angle binning is a way of binning geophysical data
-	(or other types of data which are naturally spherically located, lat, lon), which tackles the
-	problem of bins of fixed latitude/longitude width covering different amounts of surface area.
-	The bins produced by the Equal Solid Angle Scheme are guaranteed to each cover nearly the same
-	surface area. Although many schemes which share this property are possible, for simplicity, this
-	code implements only a fixed latitude width variety (that is, all bins have the same latitude span,
-	but each band of latitude has a different number of longitudinal bins).
-	"""
-	def __init__(self,delta_lat,n_cap_bins=3,azi_coord='lt'):
-		"""
-		INPUTS
-		------
-			delta_lat - float
-				The latitudinal width of the bins to be produced
-
-			n_cap_bins - integer, optional
-				The number of bins touching the northern pole,
-				(or southern since symmetric)/
-				the minimum number of bins in a latitude band
-				default is 3
-
-			azi_coord - {'lon','lt'}, optional
-				Which type of zonal/azimuthal/longitudinal coordinate to use
-				('lon' for longitude, 'lt' forlocaltime)
-
-			rectangular - bool, optional
-				Use a rectangular grid ()
-
-		RETURNS
-		-------
-			Nothing
-		"""
-		self.delta_lat = delta_lat
-		self.n_lat_bins = int(180./self.delta_lat-1.)
-		self.n_cap_bins = n_cap_bins
-		self.azi_coord = azi_coord
-
-		#Check if we have an integer number of bins
-		if not np.equal(np.mod(self.n_lat_bins,1),0):
-			print("Warning: Non-integer number of latitudinal(meridional) bands, %.1f does not divide evenly into 180.\n" %(self.delta_lat))
-			print("A value of %.2f deg per bin will be used." % (180./np.floor(self.n_lat_bins+1.)))
-			self.n_lat_bins = np.floor(self.n_lat_bins)
-
-		#Create the edges for each bin
-		self.lat_bin_edges = np.linspace(-90.,90.,num=int(self.n_lat_bins+1))
-		self.lon_bin_edges = []
-		self.flat_bins = [] #A flat list of bins from south to north, -180 to 180 lon
-							#format is flat_bins[i] = [ith_bin_lat_start,ith_bin_lat_end,ith_bin_lon_start,ith_bin_lon_end]
-		self.bin_map = []
-		self.all_bin_inds = []
-
-		#Determine conversion factor for radians to hours or degress
-		#depending on whether we're using longitude or localtime
-		if self.azi_coord == 'lon':
-			self.azi_fac = 180./np.pi
-			self.max_azi = 180.
-			self.min_azi = -180.
-			self.azi_units = 'degrees'
-		elif self.azi_coord == 'lt':
-			self.azi_fac = 12./np.pi
-			self.max_azi = 12.
-			self.min_azi = -12.
-			self.azi_units = 'hours'
-		else:
-			raise ValueError('Invalid azimuthal coordinate %s' % (self.azi_coord))
-
-		flat_ind = 0 #the flat index of the nth lon bin in the mth lat band
-		for m in range(len(self.lat_bin_edges)-1):
-			#Compute the longitude bins for the mth latitude band
-			self.lon_bin_edges.append(self.lonbins(self.lat_bin_edges[m],self.lat_bin_edges[m+1],self.n_cap_bins))
-
-			#Add the the mth lon bin from the nth latitude band to the flat_bins and increment the flat_ind
-			lat_band_flat_inds = [] #This lat band's flat index for each lon bin
-			for n in range(len(self.lon_bin_edges[-1])-1):
-				self.flat_bins.append([self.lat_bin_edges[m],self.lat_bin_edges[m+1],\
-													self.lon_bin_edges[-1][n],self.lon_bin_edges[-1][n+1]])
-				#Add this bin index to this latitude band (for inclusion in
-				#bin map)
-				lat_band_flat_inds.append(flat_ind)
-
-				#Add this bin index to the list of all bin incides
-				self.all_bin_inds.append(flat_ind)
-
-				flat_ind+=1
-
-			#Add the flat indices of the longitude bins for the mth latitude band to the the bin_map
-			#this must be an array so that which_bin can index it with the output
-			#of np.digitize
-			self.bin_map.append(np.array(lat_band_flat_inds))
-
-
-		#Convert rectangular 4 x n_bins list of lat / azi limits of bins to arr
-		self.flat_bins = np.array(self.flat_bins)
-
-		#Convert list of all bin flat indices into an array
-		self.all_bin_inds = np.array(self.all_bin_inds)
-
-	def __str__(self):
-		strrep = ''
-		strrep += 'Equal Solid Angle Binning Grid\n'
-		strrep += 'Latitude Spacing {} (deg)\n'.format(self.delta_lat)
-		strrep += '{} Longitude Bins at Poles'.format(self.n_cap_bins)
-		strrep += 'Azimuthal Coordinate {}\n'.format(self.azi_coord)
-		strrep += 'Azimuth Range {} - {}\n'.format(self.min_azi,self.max_azi)
-		strrep += '{} total bins'.format(np.nanmax(self.all_bin_inds))
-		return strrep
-
-	def __eq__(self,other):
-		if not isinstance(other,esagrid):
-			raise TypeError('{} is not an esagrid instance'.format(other))
-		return (self.delta_lat==other.delta_lat\
-				 and self.n_cap_bins==other.n_cap_bins\
-				 and self.azi_coord==other.azi_coord)
-
-	def azirangecheck(self,arr):
-		#fmod preserves sign of input
-		toobig = arr>(self.max_azi-self.min_azi)
-		arr[toobig] = arr[toobig]-(self.max_azi-self.min_azi)
-		arr[arr<self.min_azi] = arr[arr<self.min_azi] + (self.max_azi-self.min_azi)
-		return arr
-
-	def make_binable_lat_copy(self,lat):
-		#check that lat is sane
-		badlat = np.logical_or(lat>90.,
-			lat<-90.)
-		if np.count_nonzero(badlat)>0.:
-			raise ValueError('Invalid latitude (|lat|>90.) values: %s' % (str(lat[badlat])))
-
-		lat_to_bin = lat.copy()
-
-		#Doesn't handle exactly 90 latitude properly (< not <= in digitize?) so we
-		#must fudge
-		lat_to_bin[lat==90.]=89.95
-		lat_to_bin[lat==-90.]=-89.95
-
-		return lat_to_bin
-
-	def make_binable_lonorlt_copy(self,lonorlt):
-		"""
-		Make copy of azimuthal coordinate array which
-		has been changed to have the expected sign convention
-		(e.g. -180 to 180 longitude as opposed to 0-360)
-		"""
-
-		#Check for azimuth values that wrap above or below the
-		#the specified azi bounds
-		lonorlt_to_bin = lonorlt.copy()
-
-		above_max = lonorlt_to_bin > self.max_azi
-		below_min = lonorlt_to_bin < self.min_azi
-		lonorlt_to_bin[above_max] -= (self.max_azi-self.min_azi)
-		lonorlt_to_bin[below_min] += (self.max_azi-self.min_azi)
-
-		#Check for azimuth values exactly at the maximum and minimum values
-		equal_max = lonorlt_to_bin == self.max_azi
-		equal_min = lonorlt_to_bin == self.min_azi
-		lonorlt_to_bin[equal_max] -= (self.max_azi-self.min_azi)/1000.
-		lonorlt_to_bin[equal_min] += (self.max_azi-self.min_azi)/1000.
-
-		return lonorlt_to_bin
-
-	def whichbin(self,lat,lonorlt):
-		"""
-		Returns the flat index and the 2 digit index (lat_band_number, lon_bin_of_lat_band_number)
-		of each (lat,lonorlt) pair.
-		"""
-
-		lat_to_bin = self.make_binable_lat_copy(lat)
-		lonorlt_to_bin = self.make_binable_lonorlt_copy(lonorlt)
-
-		latbands = np.digitize(lat_to_bin,self.lat_bin_edges)-1
-		#the -1 is because it returns 1 if bins[0]<x<bins[1]
-
-		#Figure out which latbands have points so we don't have to search all of them
-		unique_latbands = np.unique(latbands)
-
-		flat_inds = np.zeros(lat_to_bin.shape,dtype=int)
-		lonbins = np.zeros_like(latbands)
-
-		for band_ind in unique_latbands:
-			in_band = latbands==band_ind
-			lonbins[in_band] =  np.digitize(lonorlt_to_bin[in_band],self.lon_bin_edges[band_ind])-1
-			flat_inds[in_band] = self.bin_map[band_ind][lonbins[in_band]]
-
-		return latbands,lonbins,flat_inds
-
-	def binarea(self,bindims,r_km=6371.2+110.):
-		"""
-		Simply returns the bin surface area in km,
-		assuming that the bin is a spherical
-		rectangle on a sphere of radius r_km kilometers
-
-		INPUTS
-		------
-			bindims - [lat_start,lat_end,lonorlt_start,lonorlt_end]
-
-			r_km - float, optional
-				The radius of the sphere, in kilometers, defaults
-				to Re+110km, i.e. the hieght of the ionosphere
-
-		RETURNS
-		-------
-			A - float
-				The surface area of the patch in km**2
-
-		"""
-		theta2 = (90.-bindims[0])*np.pi/180. #theta / lat - converted to radians
-		theta1 = (90.-bindims[1])*np.pi/180. #theta / lat - converted to radians
-		dazi = spheretools.angle_difference(bindims[3],bindims[2])
-		dphi = np.abs(dazi)/self.azi_fac #delta phi / lon - converted to radians
-		return np.abs(r_km**2*dphi*(np.cos(theta1)-np.cos(theta2)))
-
-	def lonbins(self,lat_start,lat_end,n_cap_bins):
-		"""
-		Finds the longitudinal boundaries of the bins which
-		have latitude boundaries lat_start and lat_end.
-		The number of bins per latitude band is determined
-		by scaling the number of bins touching the northern pole (n_cap_bins),
-		i.e. the smallest possible number of bins in a latitude band.
-		The scaling factor is derived by staring from the differential
-		form of the solid angle:
-
-		d(solid_angle) = sin(colat)d(colat)d(longitude)
-
-		Then performing the integration around all longitudes
-		and from colat_1 to colat_2, to get the total
-		solid angle of a band from colat_1 to colat_2.
-
-		Then a ratio is formed between the solid angle of an arbitrary
-		band and the solid angle encompassed by the cap, i.e. the
-		band between 0 colat and abs(colat_2-colat_1):
-
-		2*pi/N_min*(1-cos(colat_2-colat_1))=2*pi/N_(1,2)*(cos(colat_2)-cos(colat_1))
-
-		Finally, N_(1,2), the number of bins between colats 1 and 2 is solved for,
-		as a function of N_min, the number of bins in the cap band.
-
-		Of course, this formula is not guaranteed to produce an integer,
-		so the result is rounded, producing close to, but not exactly,
-		equal solid angle bins. Larger values of n_cap_bins produce
-		more nearly exactly the same solid angle per bin.
-		"""
-		th1 = (90.-lat_start)*np.pi/180.
-		th2 = (90.-lat_end)*np.pi/180.
-		N12 = (np.cos(th1)-np.cos(th2))/(1-np.cos(th2-th1))*n_cap_bins
-		N12 = np.abs(np.round(N12))
-		#+1 because we want N12 bins so we need N12+1 edges
-		bins = np.linspace(-1*np.pi,np.pi,num=int(N12+1))*self.azi_fac
-
-		#Check for any out of range values
-		#print bins
-
-		return bins
-
-	def bin_locations(self,center_or_edges='edges'):
-		"""
-		Get the location of each of the n_bins=len(self.flat_bins) bins
-
-		if center_or_edges == 'edges', returns n_bins x 4 array:
-		[left_lat_edges,right_lat_edge,lower_longitude_lt_edge,upper_longitude_lt_edge]
-
-		if center_or_edges == 'center', returns n_bins x 2 array:
-		[center latitude of bin, center longitude/local time of bin]
-		"""
-		if center_or_edges == 'edges':
-			lat_edges = self.flat_bins[:,[0,1]]
-			lonorlt_edges = self.azirangecheck(self.flat_bins[:,[2,3]])
-			return lat_edges,lonorlt_edges
-		elif center_or_edges == 'center':
-			lat_centers = spheretools.angle_midpoint(self.flat_bins[:,0],
-														self.flat_bins[:,1],
-														'degrees')
-			lonorlt_centers = spheretools.angle_midpoint(self.flat_bins[:,2],
-														 self.flat_bins[:,3],
-														 self.azi_units)
-			lonorlt_centers = self.azirangecheck(lonorlt_centers)
-			return lat_centers,lonorlt_centers
-		else:
-			raise ValueError('Invalid center_or_edges value %s' %(center_or_edges))
-
-	def bin_stats(self,lat,lonorlt,data,statfun=np.mean,center_or_edges='edges'):
-
-		latbands,lonbins,flat_inds = self.whichbin(lat,lonorlt)
-
-		binstats = np.zeros((len(self.flat_bins[:,0]),))
-		binstats[:] = np.nan
-
-		populated_bins = np.unique(flat_inds)
-
-		for bin_ind in populated_bins:
-			in_bin = flat_inds == bin_ind
-			binstats[bin_ind] = statfun(data[in_bin].flatten())
-
-		binlats,binlonorlts = self.bin_locations(center_or_edges=center_or_edges)
-
-		return binlats,binlonorlts,binstats
-
-class DefaultEsagrid(Esagrid):
-	"""Default settings of a 3 degrees latitude per band, 3 cap bins, with
-	localtime as the azimuthal coordinate"""
-	def __init__(self,delta_lat=3,n_cap_bins=3,azi_coord='lt'):
-		Esagrid.__init__(self,delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
->>>>>>> b3784ae0c42f18e479224b62129f839bdf85e794:esabin/esabin.py
