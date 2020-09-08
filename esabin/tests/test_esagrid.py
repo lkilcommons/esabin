@@ -4,7 +4,7 @@ import shutil,tempfile,os
 import numpy as np
 import h5py
 from numpy.random import default_rng
-from esabin.esagrid import Esagrid,EsagridBin
+from esabin.esagrid import Esagrid,ConstantAzimuthalSpacingGrid,EsagridBin
 
 class SyntheticDatasource(object):
     """Creates synthetic data to test binning"""
@@ -62,4 +62,12 @@ def test_esagrid_raises_valueerror_on_bad_deltalat():
     with pytest.raises(ValueError):
         delta_lat=.7
         grid = Esagrid(delta_lat)
+
+def test_constantazimuthalspacinggrid_raises_valueerror_on_bad_deltaazi():
+    """Esagrid constructor should error if it can't get an integer number
+    of latitude bands with the given latitude spacing"""
+    with pytest.raises(ValueError):
+        delta_azi = .33
+        grid = ConstantAzimuthalSpacingGrid(3.,delta_azi)
+
 

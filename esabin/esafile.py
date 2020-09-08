@@ -4,7 +4,7 @@
 import numpy as np
 import h5py,os,shutil
 from collections import OrderedDict
-from esabin.esagrid import Esagrid,EsagridBin
+from esabin.esagrid import Esagrid,ConstantAzimuthalSpacingGrid,EsagridBin
 from esabin import spheretools
 
 class EsaGridFileDuplicateTimeError(Exception):
@@ -108,7 +108,7 @@ class EsagridFileBinGroup(object):
 
 	def _check_flatind(self,flatind):
 		grid = self.esagrid_bin.grid
-		if flatind not in grid.all_bin_inds:
+		if flatind < 0 or flatind>=grid.n_bins:
 			raise InvalidFlatIndexError(('No bin with flat index {}'.format(flatind)
 							   			+'in grid {}'.format(str(grid))))
 
@@ -400,13 +400,22 @@ class EsagridFile(object):
 	def create_grid_from_metadata(self):
 		with h5py.File(self.h5fn) as h5f:
 			delta_lat = h5f.attrs['delta_lat']
-			n_cap_bins = h5f.attrs['n_cap_bins']
 			try:
 				azi_coord = str(h5f.attrs['azi_coord'],'utf8')
 			except:
 				azi_coord = h5f.attrs['azi_coord']
 
-		return Esagrid(delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
+			if 'n_cap_bins' in h5f.attrs:
+				n_cap_bins = h5f.attrs['n_cap_bins']
+				return Esagrid(delta_lat,n_cap_bins=n_cap_bins,azi_coord=azi_coord)
+			elif 'delta_azi' in h5f.attrs:
+				delta_azi = h5f.attrs['delta_azi']
+				return ConstantAzimuthalSpacingGrid(delta_lat,delta_azi,azi_coord)
+			else:
+				raise ValueError(('Missing H5 attribute; cannot specify grid'
+				                  +'\ndid not find either "n_cap_bins" (esagrid)'
+				                  +'\n or "delta_azi" (constant azi spacing grid)'
+				                  +'\nin attrs: {}'.format(h5f.attrs)))
 
 	def bin_and_store(self,t,lat,lonorlt,data,silent=False,additional_attrs=None):
 
