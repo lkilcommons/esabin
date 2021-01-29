@@ -392,13 +392,13 @@ class EsagridFile(object):
 			yield flatind
 
 	def write_grid_metadata(self):
-		with h5py.File(self.h5fn) as h5f:
+		with h5py.File(self.h5fn,'a') as h5f:
 			h5f.attrs['delta_lat'] = self.grid.delta_lat
 			h5f.attrs['n_cap_bins'] = self.grid.n_cap_bins
 			h5f.attrs['azi_coord'] = self.grid.azi_coord
 
 	def create_grid_from_metadata(self):
-		with h5py.File(self.h5fn) as h5f:
+		with h5py.File(self.h5fn,'r') as h5f:
 			delta_lat = h5f.attrs['delta_lat']
 			try:
 				azi_coord = str(h5f.attrs['azi_coord'],'utf8')
@@ -421,7 +421,7 @@ class EsagridFile(object):
 
 		latbands,lonbins,flatinds = self.grid.whichbin(lat,lonorlt)
 
-		with h5py.File(self.h5fn) as h5f:
+		with h5py.File(self.h5fn,'a') as h5f:
 			for bin_ind in np.unique(flatinds):
 
 				in_bin = flatinds == bin_ind
@@ -490,7 +490,7 @@ class EsagridFile(object):
 		#Locate the bins
 		binlats,binlonorlts = self.grid.bin_locations(center_or_edges=center_or_edges)
 
-		with h5py.File(self.h5fn) as h5f:
+		with h5py.File(self.h5fn,'a') as h5f:
 			stats_computed = 'binstats_results' in h5f and \
 				all([dataset_name in h5f['binstats_results'] \
 					for dataset_name in statfun_dataset_names])
