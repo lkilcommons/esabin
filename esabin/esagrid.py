@@ -218,8 +218,8 @@ class ConstantLatitudeSpacingGrid(object):
         """
         theta2 = (90.-bindims[0])*np.pi/180. #theta / lat - converted to radians
         theta1 = (90.-bindims[1])*np.pi/180. #theta / lat - converted to radians
-        dazi = spheretools.angle_difference(bindims[3],bindims[2])
-        dphi = np.abs(dazi)/self.azi_fac #delta phi / lon - converted to radians
+        dazi = spheretools.angle_difference(bindims[3],bindims[2],self.azi_units)
+        dphi = np.abs(dazi)*self.azi_fac #delta phi / lon - converted to radians
         return np.abs(r_km**2*dphi*(np.cos(theta1)-np.cos(theta2)))
 
     def whichbin(self,lat,lonorlt):
