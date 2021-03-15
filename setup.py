@@ -11,7 +11,7 @@ from setuptools import setup, Extension
 from setuptools.command import install as _install
 
 setup(name='esabin',
-      version = "0.2.0",
+      version = "0.2.1",
       description = "Bin geophysical data in equal solid angle bins",
       author = "Liam Kilcommons",
       author_email = 'liam.kilcommons@colorado.edu',
