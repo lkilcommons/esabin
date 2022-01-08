@@ -65,7 +65,7 @@ def test_esagrid_raises_valueerror_on_bad_deltalat():
 
 def test_constantazimuthalspacinggrid_raises_valueerror_on_bad_deltaazi():
     """Esagrid constructor should error if it can't get an integer number
-    of latitude bands with the given latitude spacing"""
+    of azimuthal bands with the given azimuthal spacing"""
     with pytest.raises(ValueError):
         delta_azi = .33
         grid = ConstantAzimuthalSpacingGrid(3.,delta_azi)

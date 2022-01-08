@@ -19,59 +19,6 @@ class InvalidBinGroupNameError(Exception):
 class EsagridBinComparisonError(Exception):
 	pass
 
-class EsagridBin(object):
-	"""Class which abstractly represents one bin in a grid"""
-	def __init__(self,grid,flatind):
-		self._meta = OrderedDict()
-		self.grid = grid
-
-		self['flatind'] = flatind
-		self['slat'] = grid.flat_bins[flatind,0]
-		self['elat'] = grid.flat_bins[flatind,1]
-		self['lat'] = spheretools.angle_midpoint(self['slat'],
-													self['elat'],
-													grid.azi_units)
-		self['sazi'] = grid.flat_bins[flatind,2]
-		self['eazi'] = grid.flat_bins[flatind,3]
-		self['azi'] = spheretools.angle_midpoint(self['sazi'],
-													self['eazi'],
-													grid.azi_units)
-
-		#Alias azimuth coordinate by lon or lt
-		self['s{}'.format(grid.azi_coord)]=self['sazi']
-		self['e{}'.format(grid.azi_coord)]=self['eazi']
-		self['{}'.format(grid.azi_coord)]=self['azi']
-
-		self['azi_coord']=grid.azi_coord
-
-		#Long name of bin
-		self['longname'] = str(self)
-
-	def __str__(self):
-		return ('#%d,' % (self['flatind'])
-		 		+'lat:%.3f-%.3f,' % (self['slat'],self['elat'])
-		 		+'%s:%.3f-%.3f' % (self['azi_coord'],self['sazi'],self['eazi']))
-
-	def __eq__(self,other):
-		bin_edge_keys = ['slat','elat','sazi','eazi']
-		edges_match = []
-		for key in bin_edge_keys:
-			edges_match.append(np.isclose(self[key],other[key],
-											rtol=0.,atol=1.0e-8))
-		return all(edges_match)
-
-	def __getitem__(self,key):
-		return self._meta[key]
-
-	def __setitem__(self,key,value):
-		self._meta[key]=value
-
-	def items(self):
-		return self._meta.items()
-
-	def __contains__(self,key):
-		return key in self._meta
-
 class EsagridFileBinGroup(object):
 	"""Class which abstractly represents the H5 group which describes
 	a bin's position and data"""
@@ -174,17 +121,20 @@ class EsagridFileBinGroup(object):
 			data = h5ds[:]
 			self.store(h5f,h5dsname,data,additional_attrs=additional_attrs)
 
-	def store(self,h5f,t,data,additional_attrs=None,silent=False):
+	def store(self,h5f,jd,data,additional_attrs=None,silent=False):
+		"""Store an array of data taken at a particular time. Time
+		is assumed to be specified as a floating point number (Julian date)
+		"""
 		h5grp = self.get_h5group(h5f)
 
-		if isinstance(t,np.ndarray):
+		if isinstance(jd,np.ndarray):
 			#If time is an array, use the first value in the bin
 			#as the hdf5 dataset name
-			h5datasetnm = str(t.flatten()[0])
+			h5datasetnm = str(jd.flatten()[0])
 		else:
 			#If time is not an array, just use it's string
 			#version as the dataset name
-			h5datasetnm = str(t)
+			h5datasetnm = str(jd)
 
 		#Ensure no dataset name collisions
 		if h5datasetnm in h5grp:
@@ -290,29 +240,28 @@ class EsagridFile(object):
 	Uses h5py interface to HDF5 library.
 
 	HDF5 files are organized thus:
-	-Each bin gets a HDF5 group.
-	-Each time the bin_and_store function is called, all of the groups/bins are iterated
-		through and any data which falls within the bin's lat,lt or lat,lon boundaries is stored
-		as a new dataset.
+	
+	Each bin gets a HDF5 group.
+	
+	Each time the bin_and_store function is called, all of the groups/bins are iterated
+	through and any data which falls within the bin's lat,lt or lat,lon boundaries is stored
+	as a new dataset.
 
-	INPUTS
-	------
-		hdf5_filenm - str
-			The filename of the hdf5 file to store to. If this is an existing file
-			and clobber == False, will use the stored metadata in the file to
-			create the appropriate esagrid and you can continue adding to the file
-			or process results from it
-
-		grid - an esagrid instance, optional
-			The grid of bins to bin into. If it is None (default), a default grid
-			with delta_lat = 3 and n_cap_bins = 3 and azi_coord = 'lt' is used
-
-		hdf5_local_dir - str, optional
-			A valid local path at which the hdf5 files will be created
-
-		clobber - bool, optional
-			If True, will delete and overwrite the HDF5 file specified as os.path.join(hdf5_local_dir,hdf5_filenm)
-			if it exists.
+	PARAMETERS
+	----------
+	hdf5_filenm : str
+		The filename of the hdf5 file to store to. If this is an existing file
+		and clobber == False, will use the stored metadata in the file to
+		create the appropriate esagrid and you can continue adding to the file
+		or process results from it
+	grid : esabin.esagrid.ConstantLatitudeSpacingGrid, optional
+		The grid of bins to bin into. If it is None (default), a default grid
+		with delta_lat = 3 and n_cap_bins = 3 and azi_coord = 'lt' is used
+	hdf5_local_dir : str, optional
+		A valid local path at which the hdf5 files will be created
+	clobber : bool, optional
+		If True, will delete and overwrite the HDF5 file specified as os.path.join(hdf5_local_dir,hdf5_filenm)
+		if it exists.
 	"""
 	def __init__(self,hdf5_filenm,grid=None,hdf5_local_dir=None,clobber=False):
 
@@ -418,7 +367,29 @@ class EsagridFile(object):
 				                  +'\nin attrs: {}'.format(h5f.attrs)))
 
 	def bin_and_store(self,t,lat,lonorlt,data,silent=False,additional_attrs=None):
+		"""Store data into HDF5 file bin groups. 
 
+		All arrays must be shape (n,) or shape (n,1) or shape (1,n).
+
+		PARAMETERS
+		----------
+
+		t : np.ndarray
+			Array of times (any float numeric representation)
+		lat : np.ndarray
+			Array of latitudes
+		lonorlt : np.ndarray
+			Array of longitudes or local times
+		data : np.ndarray
+			Array of data to bin
+		silent : bool,optional
+			Do not print status messages (default False)
+		additional_attrs : dict,optional
+			A dictionary of additional information which will be stored as
+			HDF5 attributes attached to any Datasets created by this function
+			call. Keys will be used as attribute names. Attribute values will
+			be stored as string representations of dictionary values (str(val)).
+		"""
 		latbands,lonbins,flatinds = self.grid.whichbin(lat,lonorlt)
 
 		with h5py.File(self.h5fn,'a') as h5f:
@@ -437,7 +408,7 @@ class EsagridFile(object):
 
 	def dataset_passes_attr_filters(self,dataset,attr_filters,default_result=True):
 		"""
-		filtering whether to include a specific dataset in a bin_stats
+		Filtering whether to include a specific dataset in a bin_stats
 		sample for a particular bin
 
 		Filters are specified as a nested dictionary
@@ -446,6 +417,7 @@ class EsagridFile(object):
 
 		where:
 			'attr_key' : the NAME of the HDF5 attribute of the dataset
+			
 			test_function : a python lambda function or other function
 							to apply to the value of attribute.
 							This function must return a single True or
@@ -467,7 +439,8 @@ class EsagridFile(object):
 						silent=False,force_recompute=False,
 						write_to_h5=True,attr_filters=None):
 		"""
-			if statfun is list of functions, they will be applied succesively and binstats will be a list
+			if statfun is list of functions, they will be applied succesively 
+			and binstats will be a list
 			this is more time efficient than calling bin_stats multiple times
 		"""
 		if not isinstance(statfun,list):

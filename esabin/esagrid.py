@@ -40,6 +40,14 @@ class EsagridBin(object):
                 +'lat:%.3f-%.3f,' % (self['slat'],self['elat'])
                 +'%s:%.3f-%.3f' % (self['azi_coord'],self['sazi'],self['eazi']))
 
+    def __eq__(self,other):
+        bin_edge_keys = ['slat','elat','sazi','eazi']
+        edges_match = []
+        for key in bin_edge_keys:
+            edges_match.append(np.isclose(self[key],other[key],
+                                            rtol=0.,atol=1.0e-8))
+        return all(edges_match)
+
     def __getitem__(self,key):
         return self._meta[key]
 
@@ -51,6 +59,7 @@ class EsagridBin(object):
 
     def __contains__(self,key):
         return key in self._meta
+
 
 # class SphericalRectangleBins(object):
 #     """Class with list-like interface specifying bins which represent
@@ -202,18 +211,18 @@ class ConstantLatitudeSpacingGrid(object):
         assuming that the bin is a spherical
         rectangle on a sphere of radius r_km kilometers
 
-        INPUTS
-        ------
-            bindims - [lat_start,lat_end,lonorlt_start,lonorlt_end]
-
-            r_km - float, optional
-                The radius of the sphere, in kilometers, defaults
-                to Re+110km, i.e. the hieght of the ionosphere
+        PARAMETERS
+        ----------
+        bindims : list
+            [lat_start,lat_end,lonorlt_start,lonorlt_end]
+        r_km : float, optional
+            The radius of the sphere, in kilometers, defaults
+            to Re+110km, i.e. the hieght of the ionosphere
 
         RETURNS
         -------
-            A - float
-                The surface area of the patch in km**2
+        A : float
+            The surface area of the patch in km**2
 
         """
         theta2 = (90.-bindims[0])*np.pi/180. #theta / lat - converted to radians
@@ -227,18 +236,20 @@ class ConstantLatitudeSpacingGrid(object):
         
         PARAMETERS
         ----------
-            lat - np.ndarray, shape=(n,)
-                Array of 'n' latitudes
-            lonorlt - np.ndarray, shape=(n,)
-                Array of 'n' azimuthal coordinates (longitudes or localtimes)
+        lat : np.ndarray, shape=(n,)
+            Array of 'n' latitudes
+        lonorlt : np.ndarray, shape=(n,)
+            Array of 'n' azimuthal coordinates (longitudes or localtimes)
 
         RETURNS
         -------
-            latbands - np.ndarray, dtype=int, shape=(n,)
-                Array of index of the latitude band of each location
-            lonbins - np.ndarray, dtype=int, shape=(n,)
-                Array of index of longitude bin within the latitude band
-            flat_inds 
+        latbands : np.ndarray, dtype=int, shape=(n,)
+            Array of index of the latitude band of each location
+        lonbins : np.ndarray, dtype=int, shape=(n,)
+            Array of index of longitude bin within the latitude band
+        flat_inds : np.ndarray, dtype=int, shape=(n,)
+            Array of index of bin (flat index)
+
         """
 
         #This is nessecary to make sure that the input data
@@ -317,18 +328,16 @@ class ConstantAzimuthalSpacingGrid(ConstantLatitudeSpacingGrid):
     """
     def __init__(self,delta_lat,delta_azi,azi_coord='lt'):
         """
-        INPUTS
-        ------
-            delta_lat - float
-                The latitudinal width of the bins to be produced
-
-            delta_azi - float
-                The width of each azimuthal bins in degrees if
-                azi_coord is lon, or hours if azi_coord is lt
-
-            azi_coord - {'lon','lt'}, optional
-                Which type of zonal/azimuthal/longitudinal coordinate to use.
-                Defaults to 'lt'
+        PARAMETERS
+        ----------
+        delta_lat : float
+            The latitudinal width of the bins to be produced
+        delta_azi : float
+            The width of each azimuthal bins in degrees if
+            azi_coord is lon, or hours if azi_coord is lt
+        azi_coord : {'lon','lt'}, optional
+            Which type of zonal/azimuthal/longitudinal coordinate to use.
+            Defaults to 'lt'
         """
         ConstantLatitudeSpacingGrid.__init__(self,delta_lat,azi_coord)
         
@@ -365,21 +374,18 @@ class Esagrid(ConstantLatitudeSpacingGrid):
     """
     def __init__(self,delta_lat,n_cap_bins=3,azi_coord='lt'):
         """
-        INPUTS
-        ------
-            delta_lat - float
-                The latitudinal width of the bins to be produced
-
-            n_cap_bins - integer, optional
-                The number of bins touching the northern pole,
-                (or southern since symmetric)/
-                the minimum number of bins in a latitude band
-                default is 3
-
-            azi_coord - {'lon','lt'}, optional
-                Which type of zonal/azimuthal/longitudinal coordinate to use.
-                Defaults to 'lt'
-
+        PARAMETERS
+        ----------
+        delta_lat : float
+            The latitudinal width of the bins to be produced
+        n_cap_bins : int, optional
+            The number of bins touching the northern pole,
+            (or southern since symmetric)/
+            the minimum number of bins in a latitude band
+            default is 3
+        azi_coord : {'lon','lt'}, optional
+            Which type of zonal/azimuthal/longitudinal coordinate to use.
+            Defaults to 'lt'
         """
         ConstantLatitudeSpacingGrid.__init__(self,delta_lat,azi_coord)
         self.n_cap_bins = n_cap_bins
