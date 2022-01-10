@@ -8,7 +8,15 @@ from collections import OrderedDict
 from esabin import spheretools
 
 class EsagridBin(object):
-    """Class which abstractly represents one bin in a grid"""
+    """Class which abstractly represents one bin in a grid
+    
+    PARAMETERS
+    ----------
+    grid : esabin.esagrid.ConstantLatitudeSpacingGrid
+        Object representing the particular grid used
+    flatind : int
+        The index (number) uniquely identifying this bin
+    """
     def __init__(self,grid,flatind):
         self._meta = OrderedDict()
         self.grid = grid
@@ -60,21 +68,8 @@ class EsagridBin(object):
     def __contains__(self,key):
         return key in self._meta
 
-
-# class SphericalRectangleBins(object):
-#     """Class with list-like interface specifying bins which represent
-#     4-sided spherical polygons with 90 degree angle at each vertex. 
-#     Each rectangle has two sides (east and west sides) 
-#     which are sections of lines of constant azimuthal angle / longitude 
-#     (meridians). 
-#     The other two sides (north and south) are sections of lines 
-#     of constant polar angle / (co)latitude (paralells).
-#     """
-#     def __init__(self):
-#         self._bins = []
-
 class ConstantLatitudeSpacingGrid(object):
-    """Base class for lat/ lon or lt grids with all bins same width in lat"""
+    """Base class for constant latitude width bin grids"""
     def __init__(self,delta_lat,azi_coord):        
         self.delta_lat = float(delta_lat)
         self.azi_coord = azi_coord       
@@ -280,14 +275,20 @@ class ConstantLatitudeSpacingGrid(object):
         return latbands,lonbins,flatinds
 
     def bin_locations(self,center_or_edges='edges'):
-        """
-        Output the location of each of the n_bins=len(self.flat_bins) bins
+        """Output the location of each bin
+        
+        PARAMETERS
+        ----------
+        center_or_edges : {'center','edges'}, optional
 
-        if center_or_edges == 'edges', returns n_bins x 4 array:
-        [left_lat_edges,right_lat_edge,lower_longitude_lt_edge,upper_longitude_lt_edge]
+        RETURNS
+        -------
+        binlats : np.ndarray            
+            [left_lat_edges,right_lat_edge] or center latitude of bin        
+        binlonorlt : np.ndarray
+            [lower_longitude_lt_edge,upper_longitude_lt_edge] or center
+            longitude or lt of bin
 
-        if center_or_edges == 'center', returns n_bins x 2 array:
-        [center latitude of bin, center longitude/local time of bin]
         """
         if center_or_edges == 'edges':
             lat_edges = self.flat_bins[:,[0,1]]
@@ -306,6 +307,32 @@ class ConstantLatitudeSpacingGrid(object):
             raise ValueError('Invalid center_or_edges value %s' %(center_or_edges))
 
     def bin_stats(self,lat,lonorlt,data,statfun=np.mean,center_or_edges='edges'):
+        """Divide data by bin and evaluate some function on each bin's data 
+        
+        PARAMETERS
+        ----------
+        lat : np.ndarray
+            Latitudes for each datapoint
+        lonorlt : np.ndarray
+            Longitudes or Local Times for each data point
+        data : np.ndarray
+            Values of each data point
+        statfun : callable, optional
+            Function evaluated on each bin's data.
+            Must take an array and return a scalar (default: numpy.nanmean)
+        center_or_edges : {'center','edges'}, optional    
+            Return bin positions as bin centers (shape=(n,2)) or bin edges
+            (shape=(n,))
+
+        RETURNS
+        -------
+        binlats : np.ndarray
+            Latitudes of each bin
+        binlonorlts : np.ndarray
+            Longitudes or local times of each bin
+        binstats : np.ndarray
+            Result of evaluating statfun on data falling in each bin
+        """
 
         latbands,lonbins,flat_inds = self.whichbin(lat,lonorlt)
 
@@ -323,22 +350,21 @@ class ConstantLatitudeSpacingGrid(object):
         return binlats,binlonorlts,binstats
 
 class ConstantAzimuthalSpacingGrid(ConstantLatitudeSpacingGrid):
-    """
+    """Constant longitude / local time bins class
 
+    PARAMETERS
+    ----------
+    delta_lat : float
+        The latitudinal width of the bins to be produced
+    delta_azi : float
+        The width of each azimuthal bins in degrees if
+        azi_coord is lon, or hours if azi_coord is lt
+    azi_coord : {'lon','lt'}, optional
+        Which type of zonal/azimuthal/longitudinal coordinate to use.
+        Defaults to 'lt'
+    
     """
     def __init__(self,delta_lat,delta_azi,azi_coord='lt'):
-        """
-        PARAMETERS
-        ----------
-        delta_lat : float
-            The latitudinal width of the bins to be produced
-        delta_azi : float
-            The width of each azimuthal bins in degrees if
-            azi_coord is lon, or hours if azi_coord is lt
-        azi_coord : {'lon','lt'}, optional
-            Which type of zonal/azimuthal/longitudinal coordinate to use.
-            Defaults to 'lt'
-        """
         ConstantLatitudeSpacingGrid.__init__(self,delta_lat,azi_coord)
         
         self.delta_azi = float(delta_azi)
@@ -359,34 +385,29 @@ class ConstantAzimuthalSpacingGrid(ConstantLatitudeSpacingGrid):
         return strrep
 
     def lonbins(self,lat_start,lat_end):
+        """Return a constant number of longitude bins (defined by self.delta_azi)
+        for any latitude
+        """
         edges = np.arange(self.min_azi,self.max_azi+self.delta_azi,self.delta_azi)
         return edges
 
 class Esagrid(ConstantLatitudeSpacingGrid):
-    """
-    Equal solid angle binning class. Equal solid angle binning is a way of binning geophysical data
-    (or other types of data which are naturally spherically located, lat, lon), which tackles the
-    problem of bins of fixed latitude/longitude width covering different amounts of surface area.
-    The bins produced by the Equal Solid Angle Scheme are guaranteed to each cover nearly the same
-    surface area. Although many schemes which share this property are possible, for simplicity, this
-    code implements only a fixed latitude width variety (that is, all bins have the same latitude span,
-    but each band of latitude has a different number of longitudinal bins).
+    """Equal solid angle bins class
+    
+    PARAMETERS
+    ----------
+    delta_lat : float
+        The latitudinal width of the bins to be produced
+    n_cap_bins : int, optional
+        The number of bins touching the northern pole,
+        (or southern since symmetric)/
+        the minimum number of bins in a latitude band
+        default is 3
+    azi_coord : {'lon','lt'}, optional
+        Which type of zonal/azimuthal/longitudinal coordinate to use.
+        Defaults to 'lt'
     """
     def __init__(self,delta_lat,n_cap_bins=3,azi_coord='lt'):
-        """
-        PARAMETERS
-        ----------
-        delta_lat : float
-            The latitudinal width of the bins to be produced
-        n_cap_bins : int, optional
-            The number of bins touching the northern pole,
-            (or southern since symmetric)/
-            the minimum number of bins in a latitude band
-            default is 3
-        azi_coord : {'lon','lt'}, optional
-            Which type of zonal/azimuthal/longitudinal coordinate to use.
-            Defaults to 'lt'
-        """
         ConstantLatitudeSpacingGrid.__init__(self,delta_lat,azi_coord)
         self.n_cap_bins = n_cap_bins
         self.flat_bins,self.lon_bin_edges,self.bin_map = self.define_bins()

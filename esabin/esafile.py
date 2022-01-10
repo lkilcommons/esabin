@@ -20,8 +20,15 @@ class EsagridBinComparisonError(Exception):
 	pass
 
 class EsagridFileBinGroup(object):
-	"""Class which abstractly represents the H5 group which describes
-	a bin's position and data"""
+	"""Class representing an HDF5 Group containing data from one bin
+	
+	PARAMETERS
+	----------
+	grid : esabin.esagrid.ConstantLatitudeSpacingGrid
+		Object representing the particular grid used
+	flatind : int
+		The index (number) defining which bin this Group is for
+	"""
 	def __init__(self,grid,flatind):
 		self.esagrid_bin = EsagridBin(grid,flatind)
 		self.groupname = self._group_name_to_flatind(flatind)
@@ -235,17 +242,7 @@ class DefaultEsagrid(Esagrid):
 
 
 class EsagridFile(object):
-	"""
-	Class for storing data associated with each bin of an esagrid object on disk.
-	Uses h5py interface to HDF5 library.
-
-	HDF5 files are organized thus:
-	
-	Each bin gets a HDF5 group.
-	
-	Each time the bin_and_store function is called, all of the groups/bins are iterated
-	through and any data which falls within the bin's lat,lt or lat,lon boundaries is stored
-	as a new dataset.
+	"""Class representing HDF5 file which contains one Group for each (populated) bin
 
 	PARAMETERS
 	----------
@@ -260,8 +257,8 @@ class EsagridFile(object):
 	hdf5_local_dir : str, optional
 		A valid local path at which the hdf5 files will be created
 	clobber : bool, optional
-		If True, will delete and overwrite the HDF5 file specified as os.path.join(hdf5_local_dir,hdf5_filenm)
-		if it exists.
+		If True, will delete and overwrite the HDF5 file specified as 
+		os.path.join(hdf5_local_dir,hdf5_filenm) if it exists.
 	"""
 	def __init__(self,hdf5_filenm,grid=None,hdf5_local_dir=None,clobber=False):
 
@@ -406,7 +403,7 @@ class EsagridFile(object):
 									additional_attrs=additional_attrs,
 									silent=silent)
 
-	def dataset_passes_attr_filters(self,dataset,attr_filters,default_result=True):
+	def _dataset_passes_attr_filters(self,dataset,attr_filters,default_result=True):
 		"""
 		Filtering whether to include a specific dataset in a bin_stats
 		sample for a particular bin
@@ -438,10 +435,50 @@ class EsagridFile(object):
 						center_or_edges='edges',minlat=50.,
 						silent=False,force_recompute=False,
 						write_to_h5=True,attr_filters=None):
-		"""
-			if statfun is list of functions, they will be applied succesively 
-			and binstats will be a list
-			this is more time efficient than calling bin_stats multiple times
+		"""Apply some function to the contents of each bin
+
+		PARAMETERS
+		----------
+		statfun : callable or list, optional
+			The function which will be called. Can also be a list
+			of multiple callables (in which case a dict keyed with
+			str(callable) is returned). It is MUCH MORE EFFICIENT to
+			do this than call bin_stats multiple times.
+		statfunname : str or list, optional
+			List of custom keys (use if statfun is a list of callables)
+		center_or_edges : {'center','edges'},optional
+			Return the bin center or edges
+		minlat : float,optional
+			Minimum absolute latitude (default: 50.) below 
+			which bins are ignored.
+		silent : bool,optional
+			Do not print status messages to stdout, default False
+		force_recompute : bool,optional
+			If a particular statfun callable has be evaluated before,
+			do not return a cached result. Default False.
+		write_to_h5 : bool, optional
+			Cache the results for particular statfun callable in the HDF5.
+			Default True. If statfunname is defined, cached result will
+			be stored under that name (identity of callable is not checked)
+		attr_filters : dict, optional
+			Provides optional filtering of the data fed to the callable using
+			HDF5 attributes of the bin Datasets (additional_attrs) 
+			Key should be the HDF5 Dataset attribute name, 
+			value should be a callable which takes attribute value 
+			and returns True or False.
+
+		RETURNS
+		-------
+		binlats : np.ndarray
+			Bin latitudes (center or edges)
+		binlonorlt : np.ndarray
+			Bin longitudes or local times (center or edges)
+		binstats : np.ndarray or dict
+			If statfun is a single callable, will return an array, the
+			result of evaluating statfun. If statfun is a list, 
+			this will be a dict of arrays, keyed with either the string
+			representation of each statfun or statfunnames if they are
+			defined.
 		"""
 		if not isinstance(statfun,list):
 			statfun = [statfun]
@@ -512,7 +549,7 @@ class EsagridFile(object):
 						#Check that the dataset does not have
 						#any attributes which are in the prohibited_attrs
 						#list (an optional kwarg)
-						is_okay = self.dataset_passes_attr_filters(dataset,
+						is_okay = self._dataset_passes_attr_filters(dataset,
 																attr_filters,
 																default_result=True)
 						if is_okay:
