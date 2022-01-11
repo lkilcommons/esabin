@@ -11,6 +11,9 @@ The `esagrid` module defines two types of binning scheme.
 #. Equal-solid-angle bins (Esagrid)
 #. Constant longitude bins (ConstantAzimuthalSpacingGrid)
 
+API
+***
+
 .. autosummary::
     
     EsagridBin
