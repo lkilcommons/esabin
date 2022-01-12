@@ -8,8 +8,6 @@ esabin.esafile
 
 This module implements an HDF5-based data storage/retrieval scheme for binned data
 
-API
-***
 .. autosummary::
 
     EsagridFileBinGroup

@@ -10,13 +10,18 @@ Equal solid angle binning is a way of binning geophysical data which tackles the
 problem of bins of fixed latitude/longitude width covering different 
 amounts of surface area.
 
-The bins produced by the Equal Solid Angle Scheme each 
+The bins produced by the equal-solid-angle scheme each 
 cover nearly the same surface area. 
 
 Although many schemes which share this property are possible this
 code implements only a fixed latitude width variety 
 (that is, all bins have the same latitude span, but each band of 
 latitude has a different number of longitudinal bins).
+
+.. important::
+   
+   This documenation is intended as a detailed technical reference. To see practical examples go to https://github.com/lkilcommons/esabin_notebooks. Click the 'launch binder' badge to lauch the example notebooks and experiment with them.
+
 
 .. toctree::
    :maxdepth: 2
