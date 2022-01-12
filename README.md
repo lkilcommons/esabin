@@ -1,9 +1,7 @@
 esabin
 ======
 
-[![Documentation Status](https://readthedocs.org/projects/esabin/badge/?version=latest)](https://esabin.readthedocs.io/en/latest/?badge=latest)
-
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5842038.svg)](https://doi.org/10.5281/zenodo.5842038)
+[![Documentation Status](https://readthedocs.org/projects/esabin/badge/?version=latest)](https://esabin.readthedocs.io/en/latest/?badge=latest) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5842038.svg)](https://doi.org/10.5281/zenodo.5842038)
 
 For interactive (Binder) notebook examples see [the notebooks repo](https://github.com/lkilcommons/esabin_notebooks)
 
