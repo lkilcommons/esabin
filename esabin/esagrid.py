@@ -381,7 +381,7 @@ class ConstantAzimuthalSpacingGrid(ConstantLatitudeSpacingGrid):
         strrep += 'Azimuthal Spacing {} {}'.format(self.delta_azi,self.azi_units)
         strrep += 'Azimuthal Coordinate {}\n'.format(self.azi_coord)
         strrep += 'Azimuth Range {} - {}\n'.format(self.min_azi,self.max_azi)
-        strrep += '{} total bins'.format(np.nanmax(self.all_bin_inds))
+        strrep += '{} total bins'.format(self.flat_bins.shape[0])
         return strrep
 
     def lonbins(self,lat_start,lat_end):
@@ -415,12 +415,12 @@ class Esagrid(ConstantLatitudeSpacingGrid):
 
     def __str__(self):
         strrep = ''
-        strrep += 'Equal Solid Angle Binning Grid\n'
+        strrep += 'Equal Solid Angle Grid\n'
         strrep += 'Latitude Spacing {} (deg)\n'.format(self.delta_lat)
-        strrep += '{} Longitude Bins at Poles'.format(self.n_cap_bins)
+        strrep += '{} Bins at Poles'.format(self.n_cap_bins)
         strrep += 'Azimuthal Coordinate {}\n'.format(self.azi_coord)
         strrep += 'Azimuth Range {} - {}\n'.format(self.min_azi,self.max_azi)
-        strrep += '{} total bins'.format(np.nanmax(self.all_bin_inds))
+        strrep += '{} total bins'.format(self.flat_bins.shape[0])
         return strrep
 
     def lonbins(self,lat_start,lat_end):

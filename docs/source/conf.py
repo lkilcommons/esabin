@@ -23,7 +23,7 @@ copyright = ('2022, University of Colorado, Boulder AES-CCAR-SEDA'
 author = 'Liam Kilcommons'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2.1'
+release = '0.2.2'
 
 
 # -- General configuration ---------------------------------------------------
